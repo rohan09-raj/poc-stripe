@@ -4,9 +4,9 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import com.example.stripepoc.databinding.ActivityMainBinding
 import com.stripe.android.PaymentConfiguration
 import com.stripe.android.paymentsheet.PaymentSheet
 import com.stripe.android.paymentsheet.PaymentSheetResult
@@ -23,40 +23,54 @@ import java.io.IOException
 class MainActivity : AppCompatActivity() {
   companion object {
     private const val TAG = "MainActivity"
-    private const val BACKEND_URL = "https://18b9-103-211-19-38.ngrok.io"
+    private const val BACKEND_URL = "https://852b-103-211-19-38.ngrok.io"
   }
 
   private lateinit var paymentIntentClientSecret: String
   private lateinit var paymentSheet: PaymentSheet
 
-  private lateinit var payButton: Button
+  private lateinit var binding: ActivityMainBinding
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    setContentView(R.layout.activity_main)
+    binding = ActivityMainBinding.inflate(layoutInflater)
+    setContentView(binding.root)
 
     PaymentConfiguration.init(
       applicationContext,
-      "TODO: API_KEY_HERE"
+      "pk_test_51N5r1uSHE8F93FeUlysWOJuwo276VkTvLBy4DoQmDq4uRhRD3jP4745MzLOIykQfgaK5yNdEBLHwW5BzZT4ZVnW700pUD6xclu"
     )
 
+    binding.btnAddDetails.setOnClickListener {
+      onAddDetailsClicked()
+    }
+
     // Hook up the pay button
-    payButton = findViewById(R.id.pay_button)
-    payButton.setOnClickListener(::onPayClicked)
-    payButton.isEnabled = false
+    binding.btnPay.setOnClickListener(::onPayClicked)
+    binding.btnPay.isEnabled = false
 
     paymentSheet = PaymentSheet(this, ::onPaymentSheetResult)
-
-    fetchPaymentIntent()
   }
 
-  private fun fetchPaymentIntent() {
-    val url = "$BACKEND_URL/create-payment-intent"
+  private fun onAddDetailsClicked() {
+    val itemId = binding.etItemId.text.toString().trim()
+    val amount = binding.etItemAmount.text.toString().trim()
+
+    if(itemId.isEmpty() || amount.isEmpty()) {
+      Toast.makeText(this, "Please enter item details", Toast.LENGTH_SHORT).show()
+    } else {
+      fetchPaymentIntent(itemId.toInt(), amount.toInt())
+    }
+  }
+
+  private fun fetchPaymentIntent(itemId: Int, amount: Int) {
+    val backendUrl = binding.etServerUrl.text.toString().trim()
+    val url = if (backendUrl.length > 5) "$backendUrl/create-payment-intent" else "$BACKEND_URL/create-payment-intent"
 
     val shoppingCartContent = """
             {
                 "items": [
-                    {"id":"xl-tshirt"}
+                    {"id":$itemId, "amount": $amount}
                 ]
             }
         """
@@ -64,6 +78,7 @@ class MainActivity : AppCompatActivity() {
     val mediaType = "application/json; charset=utf-8".toMediaType()
 
     val body = shoppingCartContent.toRequestBody(mediaType)
+    Log.d(TAG, "Request body: $body")
     val request = Request.Builder()
       .url(url)
       .post(body)
@@ -83,7 +98,11 @@ class MainActivity : AppCompatActivity() {
             val responseData = response.body?.string()
             val responseJson = responseData?.let { JSONObject(it) } ?: JSONObject()
             paymentIntentClientSecret = responseJson.getString("clientSecret")
-            runOnUiThread { payButton.isEnabled = true }
+            runOnUiThread {
+              binding.btnPay.isEnabled = true
+              binding.etItemId.text?.clear()
+              binding.etItemAmount.text?.clear()
+            }
             Log.i(TAG, "Retrieved PaymentIntent")
           }
         }
@@ -107,7 +126,21 @@ class MainActivity : AppCompatActivity() {
   }
 
   private fun onPayClicked(view: View) {
-    val configuration = PaymentSheet.Configuration("Example, Inc.")
+    val googlePayConfiguration = PaymentSheet.GooglePayConfiguration(
+      environment = PaymentSheet.GooglePayConfiguration.Environment.Test,
+      countryCode = "US",
+    )
+
+    val appearance = PaymentSheet.Appearance(
+      colorsDark = PaymentSheet.Colors.defaultDark,
+      shapes = PaymentSheet.Shapes.default
+    )
+
+    val configuration = PaymentSheet.Configuration(
+      merchantDisplayName = "Rohan, Inc.",
+      appearance = appearance,
+      googlePay = googlePayConfiguration
+    )
 
     // Present Payment Sheet
     paymentSheet.presentWithPaymentIntent(paymentIntentClientSecret, configuration)
