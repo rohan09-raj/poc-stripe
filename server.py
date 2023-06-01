@@ -8,7 +8,7 @@ import os
 import stripe
 
 # This is your test secret API key.
-stripe.api_key = 'sk_test_51N5r1uSHE8F93FeUaAVT1055VyPDOS6LqynbfEIdmGxKZburyMiAIP16YQpucVuBEbHPVf6KTPQ6iIW0JwAM010D00ArJs5C4t'
+stripe.api_key = '<SECRET_API_KEY>'
 
 app = Flask(__name__, static_folder='public',
             static_url_path='', template_folder='public')
@@ -22,20 +22,22 @@ def calculate_order_amount(items):
     return amount*100
 
 
-@app.route('/create-payment-intent', methods=['POST'])
+@app.route('/create_payment_intent', methods=['POST'])
 def create_payment():
     try:
+        print(request.data)
         data = json.loads(request.data)
         # Create a PaymentIntent with the order amount and currency
         intent = stripe.PaymentIntent.create(
             amount=calculate_order_amount(data['items']),
-            currency='inr',
+            currency="usd",
             automatic_payment_methods={
-                'enabled': True,
+                "enabled": True,
             },
         )
+        print(intent)
         secret = jsonify({
-            'clientSecret': intent['client_secret']
+            'client_secret': intent['client_secret']
         })
 
         return secret
